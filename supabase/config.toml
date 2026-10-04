@@ -1,0 +1,2 @@
+[functions.send-order-accepted-push]
+verify_jwt = false
