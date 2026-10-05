@@ -6,7 +6,7 @@ This folder wires Supabase to Firebase Cloud Messaging for the driver app.
 
 1. The Flutter app registers its FCM token in `public.users.push_tokens` as a JSON array.
 2. When an order changes to `accepted`, Postgres trigger `trg_notify_on_order_accepted` calls the edge function `send-order-accepted-push`.
-3. The edge function reads active driver tokens from `users.role = 'driver'` and flattens the `users.push_tokens` JSON array before sending through the Firebase HTTP v1 API.
+3. The edge function reads active driver tokens from users where `role = 'driver'` and `verification = true`, then flattens the `users.push_tokens` JSON array before sending through the Firebase HTTP v1 API.
 
 ### Required Supabase secrets
 

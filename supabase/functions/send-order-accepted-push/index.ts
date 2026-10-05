@@ -45,6 +45,7 @@ Deno.serve(async (request) => {
     .from("users")
     .select("id, push_tokens")
     .eq("role", "driver")
+    .eq("verification", true)
     .not("push_tokens", "is", null);
 
   if (tokenError) {

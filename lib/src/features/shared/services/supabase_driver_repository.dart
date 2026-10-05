@@ -176,6 +176,10 @@ class SupabaseDriverRepository implements DriverRepository {
     if (user == null) {
       throw Exception('No active session found.');
     }
+    if (!await _isVerifiedDriver(user)) {
+      await _clearAcceptedOrdersCache(user);
+      return const [];
+    }
     final driverRowId = await _resolveDriverRowId(user);
 
     final rows = await _client
@@ -201,6 +205,10 @@ class SupabaseDriverRepository implements DriverRepository {
   Future<List<DriverOrder>> getCachedAcceptedOrders() async {
     final user = _client.auth.currentUser;
     if (user == null) {
+      return const [];
+    }
+    if (!await _isVerifiedDriver(user)) {
+      await _clearAcceptedOrdersCache(user);
       return const [];
     }
 
@@ -273,6 +281,10 @@ class SupabaseDriverRepository implements DriverRepository {
     final user = _client.auth.currentUser;
     if (user == null) {
       throw Exception('No active session found.');
+    }
+    if (!await _isVerifiedDriver(user)) {
+      await _clearAcceptedOrdersCache(user);
+      throw Exception('Your driver account is waiting for verification.');
     }
     final driverRowId = await _resolveDriverRowId(user);
 
@@ -459,6 +471,9 @@ class SupabaseDriverRepository implements DriverRepository {
     if (user == null) {
       throw Exception('No active session found.');
     }
+    if (!await _isVerifiedDriver(user)) {
+      throw Exception('Your driver account is waiting for verification.');
+    }
     final driverRowId = await _resolveDriverRowId(user);
 
     final response = status == 'picked_up'
@@ -495,6 +510,9 @@ class SupabaseDriverRepository implements DriverRepository {
     if (user == null) {
       throw Exception('No active session found.');
     }
+    if (!await _isVerifiedDriver(user)) {
+      throw Exception('Your driver account is waiting for verification.');
+    }
     final driverRowId = await _resolveDriverRowId(user);
 
     final response = await _client
@@ -515,6 +533,9 @@ class SupabaseDriverRepository implements DriverRepository {
     final user = _client.auth.currentUser;
     final normalizedToken = token.trim();
     if (user == null || normalizedToken.isEmpty) {
+      return;
+    }
+    if (!await _isVerifiedDriver(user)) {
       return;
     }
 
@@ -782,7 +803,7 @@ class SupabaseDriverRepository implements DriverRepository {
   Future<Map<String, dynamic>?> _findUserRow(User user) async {
     final byId = await _client
         .from('users')
-        .select('id, email, push_tokens')
+        .select('id, email, push_tokens, verification')
         .eq('id', user.id)
         .maybeSingle();
     if (byId != null) {
@@ -796,9 +817,19 @@ class SupabaseDriverRepository implements DriverRepository {
 
     return _client
         .from('users')
-        .select('id, email, push_tokens')
+        .select('id, email, push_tokens, verification')
         .eq('email', email)
         .maybeSingle();
+  }
+
+  Future<bool> _isVerifiedDriver(User user) async {
+    try {
+      final row = await _findUserRow(user);
+      return _toBool(row?['verification']);
+    } catch (error) {
+      debugPrint('Failed to verify driver status: $error');
+      return false;
+    }
   }
 
   Future<String> _resolveDriverRowId(User user) async {
@@ -822,5 +853,9 @@ class SupabaseDriverRepository implements DriverRepository {
       '$_acceptedOrdersCachePrefix${user.id}',
       jsonEncode(orders.map((order) => order.toJson()).toList()),
     );
+  }
+
+  Future<void> _clearAcceptedOrdersCache(User user) {
+    return _preferences.remove('$_acceptedOrdersCachePrefix${user.id}');
   }
 }
